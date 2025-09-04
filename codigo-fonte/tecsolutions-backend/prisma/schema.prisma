@@ -1,0 +1,142 @@
+// prisma/schema.prisma
+// => Define as tabelas e relacionamentos do sistema TecSolutions
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TECH
+}
+
+enum ClientType {
+  CONTRACT    // clientes com contrato
+  SPOT        // avulsos
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+}
+
+enum ReportType {
+  ONSITE   // presencial
+  REMOTE
+  LAB
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(TECH)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  proposals    Proposal[] // propostas criadas
+  reports      Report[]   // relatórios feitos
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  cnpj      String?   @unique
+  type      ClientType
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  proposals Proposal[]
+  reports   Report[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  sku         String?  @unique
+  price       Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  proposalItems ProposalItem[]
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  proposalItems ProposalItem[]
+}
+
+model Proposal {
+  id        String         @id @default(cuid())
+  clientId  String
+  userId    String
+  status    ProposalStatus @default(DRAFT)
+  total     Decimal        @db.Decimal(12, 2) @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  client  Client   @relation(fields: [clientId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  items   ProposalItem[]
+}
+
+enum ProposalItemType {
+  PRODUCT
+  SERVICE
+}
+
+model ProposalItem {
+  id          String            @id @default(cuid())
+  proposalId  String
+  type        ProposalItemType
+  productId   String?
+  serviceId   String?
+  quantity    Int               @default(1)
+  unitPrice   Decimal           @db.Decimal(12, 2)
+  total       Decimal           @db.Decimal(12, 2)
+
+  proposal    Proposal          @relation(fields: [proposalId], references: [id])
+  product     Product?          @relation(fields: [productId], references: [id])
+  service     Service?          @relation(fields: [serviceId], references: [id])
+
+  @@index([proposalId])
+}
+
+model Report {
+  id          String     @id @default(cuid())
+  clientId    String
+  userId      String
+  type        ReportType
+  date        DateTime   @default(now())
+  hours       Decimal    @db.Decimal(12, 2)   // horas trabalhadas
+  materials   String?                     // materiais utilizados
+  description String
+  pdfUrl      String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([clientId])
+  @@index([userId])
+}
