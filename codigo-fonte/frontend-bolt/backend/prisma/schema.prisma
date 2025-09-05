@@ -1,0 +1,276 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  createdBy String?
+  
+  // Relations
+  createdServiceRecords ServiceRecord[]
+  
+  @@map("users")
+}
+
+model Client {
+  id        String     @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  company   String
+  cnpj      String?
+  address   String
+  type      ClientType @default(AVULSO)
+  createdAt DateTime   @default(now())
+  
+  // Relations
+  proposals         Proposal[]
+  hardwareInventory HardwareInventory[]
+  softwareInventory SoftwareInventory[]
+  serviceRecords    ServiceRecord[]
+  
+  @@map("clients")
+}
+
+model Service {
+  id          String          @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  category    ServiceCategory
+  unit        String
+  createdAt   DateTime        @default(now())
+  
+  // Relations
+  proposalItems ProposalItem[]
+  
+  @@map("services")
+}
+
+model Product {
+  id             String          @id @default(cuid())
+  name           String
+  description    String
+  category       String
+  brand          String?
+  model          String?
+  price          Float
+  costPrice      Float?
+  stockQuantity  Int             @default(0)
+  minStockLevel  Int             @default(0)
+  unit           String
+  sku            String?         @unique
+  barcode        String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  // Relations
+  proposalProductItems ProposalProductItem[]
+  
+  @@map("products")
+}
+
+model Proposal {
+  id          String   @id @default(cuid())
+  clientId    String
+  number      String   @unique
+  title       String
+  description String
+  subtotal    Float
+  discount    Float    @default(0)
+  total       Float
+  status      ProposalStatus @default(RASCUNHO)
+  validUntil  DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  client       Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items        ProposalItem[]
+  productItems ProposalProductItem[]
+  
+  @@map("proposals")
+}
+
+model ProposalItem {
+  id         String @id @default(cuid())
+  proposalId String
+  serviceId  String
+  quantity   Int
+  unitPrice  Float
+  total      Float
+  
+  // Relations
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id])
+  
+  @@map("proposal_items")
+}
+
+model ProposalProductItem {
+  id         String @id @default(cuid())
+  proposalId String
+  productId  String
+  quantity   Int
+  unitPrice  Float
+  total      Float
+  
+  // Relations
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+  
+  @@map("proposal_product_items")
+}
+
+model HardwareInventory {
+  id              String   @id @default(cuid())
+  clientId        String
+  brand           String
+  model           String
+  serialNumber    String
+  processor       String
+  memory          String
+  storage         String
+  operatingSystem String
+  deviceName      String
+  office          String
+  antivirus       String
+  username        String
+  password        String
+  pin             String
+  warranty        String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  @@map("hardware_inventory")
+}
+
+model SoftwareInventory {
+  id              String       @id @default(cuid())
+  clientId        String
+  login           String
+  password        String
+  softwareName    String
+  softwareType    SoftwareType
+  expirationAlert DateTime
+  monthlyValue    Float?
+  annualValue     Float?
+  userControl     UserControl
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  // Relations
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  @@map("software_inventory")
+}
+
+model ServiceRecord {
+  id                 String            @id @default(cuid())
+  clientId           String
+  type               ServiceRecordType
+  date               DateTime
+  description        String
+  services           String[] // Array of service names
+  
+  // Campos específicos para atendimento presencial
+  arrivalTime        String?
+  departureTime      String?
+  lunchBreak         Boolean?
+  totalHours         Float?
+  
+  // Campos específicos para laboratório
+  deviceReceived     DateTime?
+  deviceReturned     DateTime?
+  labServices        String[] // Array of lab service names
+  
+  // Campos específicos para terceiros
+  thirdPartyCompany  String?
+  sentDate           DateTime?
+  returnedDate       DateTime?
+  cost               Float?
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdBy          String
+  
+  // Relations
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdByUser User @relation(fields: [createdBy], references: [id])
+  
+  @@map("service_records")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ClientType {
+  CONTRATO
+  AVULSO
+}
+
+enum ServiceCategory {
+  INFRAESTRUTURA
+  HELPDESK
+  NUVEM
+  BACKUP
+  CABEAMENTO
+  OUTROS
+}
+
+enum ProductCategory {
+  CABOS
+  CONECTORES
+  EQUIPAMENTOS
+  ACESSORIOS
+  OUTROS
+}
+
+enum ProposalStatus {
+  RASCUNHO
+  ENVIADA
+  APROVADA
+  RECUSADA
+}
+
+enum SoftwareType {
+  LOCAL
+  CLOUD
+  SUBSCRIPTION
+  LICENSE
+  OUTROS
+}
+
+enum UserControl {
+  AD_LOCAL
+  CLOUD
+  NONE
+}
+
+enum ServiceRecordType {
+  REMOTE
+  ONSITE
+  LABORATORY
+  THIRD_PARTY
+}
